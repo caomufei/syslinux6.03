@@ -1,0 +1,953 @@
+     1                                  ; -----------------------------------------------------------------------
+     2                                  ;
+     3                                  ;   Copyright 2010 Gene Cumm
+     4                                  ;
+     5                                  ;   Portions from diskstart.inc:
+     6                                  ;   Copyright 1994-2009 H. Peter Anvin - All Rights Reserved
+     7                                  ;   Copyright 2009-2010 Intel Corporation; author: H. Peter Anvin
+     8                                  ;
+     9                                  ;   This program is free software; you can redistribute it and/or modify
+    10                                  ;   it under the terms of the GNU General Public License as published by
+    11                                  ;   the Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+    12                                  ;   Boston MA 02110-1301, USA; either version 2 of the License, or
+    13                                  ;   (at your option) any later version; incorporated herein by reference.
+    14                                  ;
+    15                                  ; -----------------------------------------------------------------------
+    16                                  
+    17                                  ;
+    18                                  ; geodspms.asm
+    19                                  ;
+    20                                  ; Display geometry translation info for diagnosing misconceptions
+    21                                  ; multi-sector variant
+    22                                  ;
+    23                                  ;	nasm -Ox -f bin -o geodsp.bin -l geodsp.lst geodsp.asm
+    24                                  ;
+    25                                  ;	nasm -Ox -f elf -o geodsp.o -l geodsp.lst geodsp.asm
+    26                                  ;	ld -m elf_i386  -T syslinux.ld -M -o geodsp.elf geodsp.o > geodsp.map
+    27                                  ;	objcopy -O binary geodsp.elf geodsp.raw
+    28                                  ;
+    29                                  ;	# OF=/dev/sdb
+    30                                  ;	# dd if=core/geodsp.bin of=$OF
+    31                                  ;	# dd skip=1 seek=1 if=../dbg/lba-img/lba-img.bin of=$OF
+    32                                  ;	# eject $OF
+    33                                  ;	# dd count=$() if=/dev/zero of=$OF
+    34                                  ;
+    35                                  ;	# OF=geo-2.255.63.i
+    36                                  ;	# (dd if=core/geodsp.bin; dd skip=1 if=../dbg/lba-img/lba-img.bin; dd count=$((2*255*63 - 256*63 - 1)) if=/dev/zero )|dd of=$OF
+    37                                  ;	# OF=geo-20.16.63.i
+    38                                  ;	# (dd if=core/geodsp.bin; dd skip=1 if=../dbg/lba-img/lba-img.bin; dd count=$((40*16*63 - 256*63 - 1)) if=/dev/zero )|dd of=$OF
+    39                                  ;
+    40                                  
+    41                                  ; Just to define it to look like SYSLINUX
+    42                                  %define IS_SYSLINUX 1
+    43                                  
+    44                                  %include "macros.inc"
+     1                              <1> ;; -----------------------------------------------------------------------
+     2                              <1> ;;
+     3                              <1> ;;   Copyright 1994-2008 H. Peter Anvin - All Rights Reserved
+     4                              <1> ;;   Copyright 2009 Intel Corporation; author: H. Peter Anvin
+     5                              <1> ;;
+     6                              <1> ;;   This program is free software; you can redistribute it and/or modify
+     7                              <1> ;;   it under the terms of the GNU General Public License as published by
+     8                              <1> ;;   the Free Software Foundation, Inc., 53 Temple Place Ste 330,
+     9                              <1> ;;   Boston MA 02111-1307, USA; either version 2 of the License, or
+    10                              <1> ;;   (at your option) any later version; incorporated herein by reference.
+    11                              <1> ;;
+    12                              <1> ;; -----------------------------------------------------------------------
+    13                              <1> 
+    14                              <1> ;;
+    15                              <1> ;; macros.inc
+    16                              <1> ;;
+    17                              <1> ;; Convenient macros
+    18                              <1> ;;
+    19                              <1> 
+    20                              <1> %ifndef _MACROS_INC
+    21                              <1> %define _MACROS_INC
+    22                              <1> 
+    23                              <1> ;
+    24                              <1> ; Identify the module we're compiling; the "correct" should be defined
+    25                              <1> ; in the module itself to 1
+    26                              <1> ;
+    27                              <1> %ifdef IS_SYSLINUX
+    28                              <1>  %define MY_NAME 'SYSLINUX'
+    29                              <1> %else
+    30                              <1>  %define IS_SYSLINUX 0
+    31                              <1> %endif
+    32                              <1> %ifdef IS_PXELINUX
+    33                              <1>  %define MY_NAME 'PXELINUX'
+    34                              <1>  %if IS_LPXELINUX > 0
+    35                              <1>   %define MY_TYPE 'lwIP'
+    36                              <1>  %else
+    37                              <1>   %define MY_TYPE 'PXE'
+    38                              <1>  %endif
+    39                              <1> %else
+    40                              <1>  %define IS_PXELINUX 0
+    41                              <1> %endif
+    42                              <1> %ifdef IS_ISOLINUX
+    43                              <1>  %define MY_NAME 'ISOLINUX'
+    44                              <1> %else
+    45                              <1>  %define IS_ISOLINUX 0
+    46                              <1> %endif
+    47                              <1> %ifdef IS_EXTLINUX
+    48                              <1>  %define MY_NAME 'EXTLINUX'
+    49                              <1> %else
+    50                              <1>  %define IS_EXTLINUX 0
+    51                              <1> %endif
+    52                              <1> 
+    53                              <1> ;
+    54                              <1> ; Macros similar to res[bwd], but which works in the code segment (after
+    55                              <1> ; section .text16) or the data segment (section .data16)
+    56                              <1> ;
+    57                              <1> %macro	zb	1.nolist
+    58                              <1> 	times %1 db 0
+    59                              <1> %endmacro
+    60                              <1> 
+    61                              <1> %macro	zw	1.nolist
+    62                              <1> 	times %1 dw 0
+    63                              <1> %endmacro
+    64                              <1> 
+    65                              <1> %macro	zd	1.nolist
+    66                              <1> 	times %1 dd 0
+    67                              <1> %endmacro
+    68                              <1> 
+    69                              <1> ;
+    70                              <1> ; Align with zero bytes in a progbits segment
+    71                              <1> ;
+    72                              <1> %macro	alignz	1.nolist
+    73                              <1> 	times (((%1) - (($-$$) % (%1))) % (%1)) db 0
+    74                              <1> %endmacro
+    75                              <1> 
+    76                              <1> ;
+    77                              <1> ; Macro to emit an unsigned decimal number as a string
+    78                              <1> ;
+    79                              <1> %macro asciidec	1.nolist
+    80                              <1>   %ifndef DEPEND	; Not safe for "depend"
+    81                              <1>     %push asciidec
+    82                              <1>       %assign %$v %1
+    83                              <1>       %if %$v == 0
+    84                              <1>         db '0'
+    85                              <1>       %else
+    86                              <1>         %assign %$dcount 0
+    87                              <1>         %assign %$n %$v
+    88                              <1>         %assign %$d 1
+    89                              <1>         %rep 20
+    90                              <1>           %if %$n != 0
+    91                              <1>             %assign %$dcount %$dcount + 1
+    92                              <1>             %assign %$n %$n / 10
+    93                              <1>             %assign %$d %$d * 10
+    94                              <1>           %endif
+    95                              <1>         %endrep
+    96                              <1>         %rep %$dcount
+    97                              <1> 	  %assign %$d %$d / 10
+    98                              <1>           db ((%$v / %$d) % 10) + '0'
+    99                              <1>         %endrep
+   100                              <1>       %endif
+   101                              <1>     %pop
+   102                              <1>   %endif
+   103                              <1> %endmacro
+   104                              <1> 
+   105                              <1> ;
+   106                              <1> ; Macros for network byte order of constants
+   107                              <1> ;
+   108                              <1> %define htons(x)  ( ( ((x) & 0FFh) << 8 ) + ( ((x) & 0FF00h) >> 8 ) )
+   109                              <1> %define ntohs(x) htons(x)
+   110                              <1> %define htonl(x)  ( ( ((x) & 0FFh) << 24) + ( ((x) & 0FF00h) << 8 ) + ( ((x) & 0FF0000h) >> 8 ) + ( ((x) & 0FF000000h) >> 24) )
+   111                              <1> %define ntohl(x) htonl(x)
+   112                              <1> 
+   113                              <1> ;
+   114                              <1> ; ASCII
+   115                              <1> ;
+   116                              <1> CR		equ 13		; Carriage Return
+   117                              <1> LF		equ 10		; Line Feed
+   118                              <1> FF		equ 12		; Form Feed
+   119                              <1> BS		equ  8		; Backspace
+   120                              <1> 
+   121                              <1> %endif ; _MACROS_INC
+    45                                  ; %include "layout.inc"
+    46                                  
+    47                                  m_CHS0		equ 00534843h		;'CHS',0
+    48                                  m_EDD0		equ 00444445h		;'EDD',0
+    49                                  m_EDD_SP	equ 20444445h		;'EDD '
+    50                                  retry_count	equ 16
+    51                                  dbuf		equ 8000h
+    52                                  ; int13_ret	equ 7e00h
+    53                                  LDLINUX_MAGIC	equ 0x3eb202fe		; A random number to identify ourselves with
+    54                                  
+    55                                  Sect1Ptr0_VAL	equ 1
+    56                                  Sect1Ptr1_VAL	equ 0
+    57                                  
+    58                                  ; 		global STACK_LEN, STACK_TOP, STACK_BASE
+    59                                  ; STACK_LEN	equ 4096
+    60                                  STACK_TOP	equ 7c00h
+    61                                  ; STACK_BASE	equ STACK_TOP - STACK_LEN
+    62                                  		section .init
+    63                                  		org STACK_TOP
+    64                                  geodsp_start:
+    65                                  
+    66                                  %include "diskboot.inc"
+     1                              <1> ; -----------------------------------------------------------------------
+     2                              <1> ;
+     3                              <1> ;   Copyright 1994-2009 H. Peter Anvin - All Rights Reserved
+     4                              <1> ;   Copyright 2009-2011 Intel Corporation; author: H. Peter Anvin
+     5                              <1> ;
+     6                              <1> ;   This program is free software; you can redistribute it and/or modify
+     7                              <1> ;   it under the terms of the GNU General Public License as published by
+     8                              <1> ;   the Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+     9                              <1> ;   Boston MA 02110-1301, USA; either version 2 of the License, or
+    10                              <1> ;   (at your option) any later version; incorporated herein by reference.
+    11                              <1> ;
+    12                              <1> ; -----------------------------------------------------------------------
+    13                              <1> 
+    14                              <1> ;
+    15                              <1> ; diskboot.inc
+    16                              <1> ;
+    17                              <1> ; Common boot sector code for harddisk-based Syslinux derivatives.
+    18                              <1> ;
+    19                              <1> ; Requires macros z[bwd], labels ldlinux_ent, ldlinux_magic, ldlinux_sys
+    20                              <1> ; and constants BS_MAGIC_VER, LDLINUX_MAGIC, retry_count, Sect1Ptr[01]_VAL,
+    21                              <1> ; STACK_TOP
+    22                              <1> ;
+    23                              <1> 
+    24                              <1> 		section .init
+    25                              <1> ;
+    26                              <1> ; Some of the things that have to be saved very early are saved
+    27                              <1> ; "close" to the initial stack pointer offset, in order to
+    28                              <1> ; reduce the code size...
+    29                              <1> ;
+    30                              <1> 
+    31                              <1> 		global StackBuf, PartInfo, Hidden, OrigESDI, DriveNumber
+    32                              <1> 		global OrigFDCTabPtr
+    33                              <1> StackBuf	equ STACK_TOP-44-92	; Start the stack here (grow down - 4K)
+    34                              <1> PartInfo	equ StackBuf
+    35                              <1> .mbr		equ PartInfo
+    36                              <1> .gptlen		equ PartInfo+16
+    37                              <1> .gpt		equ PartInfo+20
+    38                              <1> FloppyTable	equ PartInfo+76
+    39                              <1> ; Total size of PartInfo + FloppyTable == 76+16 = 92 bytes
+    40                              <1> Hidden		equ StackBuf-24		; Partition offset (qword)
+    41                              <1> OrigFDCTabPtr	equ StackBuf-16		; Original FDC table
+    42                              <1> OrigDSSI	equ StackBuf-12		; DS:SI -> partinfo
+    43                              <1> OrigESDI	equ StackBuf-8		; ES:DI -> $PnP structure
+    44                              <1> DriveNumber	equ StackBuf-4		; Drive number
+    45                              <1> StackHome	equ Hidden		; The start of the canonical stack
+    46                              <1> 
+    47                              <1> ;
+    48                              <1> ; Primary entry point.  Tempting as though it may be, we can't put the
+    49                              <1> ; initial "cli" here; the jmp opcode in the first byte is part of the
+    50                              <1> ; "magic number" (using the term very loosely) for the DOS superblock.
+    51                              <1> ;
+    52                              <1> bootsec		equ $
+    53 00000000 EB58                <1> _start:		jmp short start		; 2 bytes
+    54 00000002 90                  <1> 		nop			; 1 byte
+    55                              <1> ;
+    56                              <1> ; "Superblock" follows -- it's in the boot sector, so it's already
+    57                              <1> ; loaded and ready for us
+    58                              <1> ;
+    59 00000003 5359534C494E5558    <1> bsOemName	db MY_NAME		; The SYS command sets this, so...
+    60                              <1> 		zb 8-($-bsOemName)
+    61                              <1> 
+    62                              <1> ;
+    63                              <1> ; These are the fields we actually care about.  We end up expanding them
+    64                              <1> ; all to dword size early in the code, so generate labels for both
+    65                              <1> ; the expanded and unexpanded versions.
+    66                              <1> ;
+    67                              <1> %macro		superb 1
+    68                              <1> bx %+ %1	equ SuperInfo+($-superblock)*8+4
+    69                              <1> bs %+ %1	equ $
+    70                              <1> 		zb 1
+    71                              <1> %endmacro
+    72                              <1> %macro		superw 1
+    73                              <1> bx %+ %1	equ SuperInfo+($-superblock)*8
+    74                              <1> bs %+ %1	equ $
+    75                              <1> 		zw 1
+    76                              <1> %endmacro
+    77                              <1> %macro		superd 1
+    78                              <1> bx %+ %1	equ $			; no expansion for dwords
+    79                              <1> bs %+ %1	equ $
+    80                              <1> 		zd 1
+    81                              <1> %endmacro
+    82                              <1> superblock	equ $
+    83                              <1> 		superw BytesPerSec
+    83                              <2> bx %+ %1 equ SuperInfo+($-superblock)*8
+    83                              <2> bs %+ %1 equ $
+    83 0000000B 0000                <2>  zw 1
+    84                              <1> 		superb SecPerClust
+    84                              <2> bx %+ %1 equ SuperInfo+($-superblock)*8+4
+    84                              <2> bs %+ %1 equ $
+    84 0000000D 00                  <2>  zb 1
+    85                              <1> 		superw ResSectors
+    85                              <2> bx %+ %1 equ SuperInfo+($-superblock)*8
+    85                              <2> bs %+ %1 equ $
+    85 0000000E 0000                <2>  zw 1
+    86                              <1> 		superb FATs
+    86                              <2> bx %+ %1 equ SuperInfo+($-superblock)*8+4
+    86                              <2> bs %+ %1 equ $
+    86 00000010 00                  <2>  zb 1
+    87                              <1> 		superw RootDirEnts
+    87                              <2> bx %+ %1 equ SuperInfo+($-superblock)*8
+    87                              <2> bs %+ %1 equ $
+    87 00000011 0000                <2>  zw 1
+    88                              <1> 		superw Sectors
+    88                              <2> bx %+ %1 equ SuperInfo+($-superblock)*8
+    88                              <2> bs %+ %1 equ $
+    88 00000013 0000                <2>  zw 1
+    89                              <1> 		superb Media
+    89                              <2> bx %+ %1 equ SuperInfo+($-superblock)*8+4
+    89                              <2> bs %+ %1 equ $
+    89 00000015 00                  <2>  zb 1
+    90                              <1> 		superw FATsecs
+    90                              <2> bx %+ %1 equ SuperInfo+($-superblock)*8
+    90                              <2> bs %+ %1 equ $
+    90 00000016 0000                <2>  zw 1
+    91                              <1> 		superw SecPerTrack
+    91                              <2> bx %+ %1 equ SuperInfo+($-superblock)*8
+    91                              <2> bs %+ %1 equ $
+    91 00000018 0000                <2>  zw 1
+    92                              <1> 		superw Heads
+    92                              <2> bx %+ %1 equ SuperInfo+($-superblock)*8
+    92                              <2> bs %+ %1 equ $
+    92 0000001A 0000                <2>  zw 1
+    93                              <1> superinfo_size	equ ($-superblock)-1	; How much to expand
+    94                              <1> 		superd Hidden
+    94                              <2> bx %+ %1 equ $
+    94                              <2> bs %+ %1 equ $
+    94 0000001C 00000000            <2>  zd 1
+    95                              <1> 		superd HugeSectors
+    95                              <2> bx %+ %1 equ $
+    95                              <2> bs %+ %1 equ $
+    95 00000020 00000000            <2>  zd 1
+    96                              <1> 		;
+    97                              <1> 		; This is as far as FAT12/16 and FAT32 are consistent
+    98                              <1> 		;
+    99                              <1> 		; FAT12/16 need 26 more bytes,
+   100                              <1> 		; FAT32 need 54 more bytes
+   101                              <1> 		;
+   102                              <1> superblock_len_fat16	equ $-superblock+26
+   103                              <1> superblock_len_fat32	equ $-superblock+54
+   104 00000024 00<rept>            <1> 		zb 54			; Maximum needed size
+   105                              <1> superblock_max	equ $-superblock
+   106                              <1> 
+   107                              <1> SecPerClust	equ bxSecPerClust
+   108                              <1> 
+   109                              <1> ;
+   110                              <1> ; Note we don't check the constraints above now; we did that at install
+   111                              <1> ; time (we hope!)
+   112                              <1> ;
+   113                              <1> start:
+   114 0000005A FA                  <1> 		cli			; No interrupts yet, please
+   115 0000005B FC                  <1> 		cld			; Copy upwards
+   116                              <1> ;
+   117                              <1> ; Set up the stack
+   118                              <1> ;
+   119 0000005C 31C9                <1> 		xor cx,cx
+   120 0000005E 8ED1                <1> 		mov ss,cx
+   121 00000060 BC767B              <1> 		mov sp,StackBuf-2	; Just below BSS (-2 for alignment)
+   122 00000063 52                  <1> 		push dx			; Save drive number (in DL)
+   123 00000064 06                  <1> 		push es			; Save initial ES:DI -> $PnP pointer
+   124 00000065 57                  <1> 		push di
+   125 00000066 1E                  <1> 		push ds			; Save original DS:SI -> partinfo
+   126 00000067 56                  <1> 		push si
+   127 00000068 8EC1                <1> 		mov es,cx
+   128                              <1> 
+   129                              <1> ;
+   130                              <1> ; DS:SI may contain a partition table entry and possibly a GPT entry.
+   131                              <1> ; Preserve it for us.  This saves 56 bytes of the GPT entry, which is
+   132                              <1> ; currently the maximum we care about.  Total is 76 bytes.
+   133                              <1> ;
+   134 0000006A B126                <1> 		mov cl,(16+4+56)/2	; Save partition info
+   135 0000006C BF787B              <1> 		mov di,PartInfo
+   136 0000006F F3A5                <1> 		rep movsw		; This puts CX back to zero
+   137                              <1> 
+   138 00000071 8ED9                <1> 		mov ds,cx		; Now we can initialize DS...
+   139                              <1> 
+   140                              <1> ;
+   141                              <1> ; Now sautee the BIOS floppy info block to that it will support decent-
+   142                              <1> ; size transfers; the floppy block is 11 bytes and is stored in the
+   143                              <1> ; INT 1Eh vector (brilliant waste of resources, eh?)
+   144                              <1> ;
+   145                              <1> ; Of course, if BIOSes had been properly programmed, we wouldn't have
+   146                              <1> ; had to waste precious space with this code.
+   147                              <1> ;
+   148 00000073 BB7800              <1> 		mov bx,fdctab
+   149 00000076 0FB437              <1> 		lfs si,[bx]		; FS:SI -> original fdctab
+   150 00000079 0FA0                <1> 		push fs			; Save on stack in case we need to bail
+   151 0000007B 56                  <1> 		push si
+   152                              <1> 
+   153                              <1> 		; Save the old fdctab even if hard disk so the stack layout
+   154                              <1> 		; is the same.  The instructions above do not change the flags
+   155 0000007C 20D2                <1> 		and dl,dl		; If floppy disk (00-7F), assume no
+   156                              <1> 					; partition table
+   157 0000007E 781B                <1> 		js harddisk
+   158                              <1> 
+   159                              <1> floppy:
+   160 00000080 31C0                <1> 		xor ax,ax
+   161 00000082 B106                <1> 		mov cl,6		; 12 bytes (CX == 0)
+   162                              <1> 		; es:di -> FloppyTable already
+   163                              <1> 		; This should be safe to do now, interrupts are off...
+   164 00000084 893F                <1> 		mov [bx],di		; FloppyTable
+   165 00000086 894702              <1> 		mov [bx+2],ax		; Segment 0
+   166 00000089 F364A5              <1> 		fs rep movsw		; Faster to move words
+   167 0000008C 8A0E[1800]          <1> 		mov cl,[bsSecPerTrack]  ; Patch the sector count
+   168 00000090 884DF8              <1> 		mov [di-12+4],cl
+   169                              <1> 
+   170 00000093 50                  <1> 		push ax			; Partition offset == 0
+   171 00000094 50                  <1> 		push ax
+   172 00000095 50                  <1> 		push ax
+   173 00000096 50                  <1> 		push ax
+   174                              <1> 
+   175 00000097 CD13                <1> 		int 13h			; Some BIOSes need this
+   176                              <1> 			; Using xint13 costs +1B
+   177 00000099 EB62                <1> 		jmp short not_harddisk
+   178                              <1> ;
+   179                              <1> ; The drive number and possibly partition information was passed to us
+   180                              <1> ; by the BIOS or previous boot loader (MBR).  Current "best practice" is to
+   181                              <1> ; trust that rather than what the superblock contains.
+   182                              <1> ;
+   183                              <1> ; Note: di points to beyond the end of PartInfo
+   184                              <1> ; Note: false negatives might slip through the handover area's sanity checks,
+   185                              <1> ;       if the region is very close (less than a paragraph) to
+   186                              <1> ;       PartInfo ; no false positives are possible though
+   187                              <1> ;
+   188                              <1> harddisk:
+   189 0000009B 8B55AA              <1> 		mov dx,[di-76-10]	; Original DS
+   190 0000009E 8B75A8              <1> 		mov si,[di-76-12]	; Original SI
+   191 000000A1 C1EE04              <1> 		shr si,4
+   192 000000A4 01F2                <1> 		add dx,si
+   193 000000A6 83FA4F              <1> 		cmp dx,4fh		; DS:SI < 50h:0 (BDA or IVT) ?
+   194 000000A9 7631                <1> 		jbe .no_partition
+   195 000000AB 81FAB207            <1> 		cmp dx,(PartInfo-75)>>4	; DS:SI in overwritten memory?
+   196 000000AF 732B                <1> 		jae .no_partition
+   197 000000B1 F645B47F            <1> 		test byte [di-76],7Fh	; Sanity check: "active flag" should
+   198 000000B5 7525                <1> 		jnz .no_partition	; be 00 or 80
+   199 000000B7 384DB8              <1> 		cmp [di-76+4],cl	; Sanity check: partition type != 0
+   200 000000BA 7420                <1> 		je .no_partition
+   201 000000BC 663D21475054        <1> 		cmp eax,'!GPT'		; !GPT signature?
+   202 000000C2 7510                <1> 		jne .mbr
+   203 000000C4 807DB8ED            <1> 		cmp byte [di-76+4],0EDh	; Synthetic GPT partition entry?
+   204 000000C8 750A                <1> 		jne .mbr
+   205                              <1> .gpt:					; GPT-style partition info
+   206 000000CA 66FF75EC            <1> 		push dword [di-76+20+36]
+   207 000000CE 66FF75E8            <1> 		push dword [di-76+20+32]
+   208 000000D2 EB0F                <1> 		jmp .gotoffs
+   209                              <1> .mbr:					; MBR-style partition info
+   210 000000D4 51                  <1> 		push cx			; Upper half partition offset == 0
+   211 000000D5 51                  <1> 		push cx
+   212 000000D6 66FF75BC            <1> 		push dword [di-76+8]	; Partition offset (dword)
+   213 000000DA EB07                <1> 		jmp .gotoffs
+   214                              <1> .no_partition:
+   215                              <1> ;
+   216                              <1> ; No partition table given... assume that the Hidden field in the boot sector
+   217                              <1> ; tells the truth (in particular, is zero if this is an unpartitioned disk.)
+   218                              <1> ;
+   219 000000DC 51                  <1> 		push cx
+   220 000000DD 51                  <1> 		push cx
+   221 000000DE 66FF36[1C00]        <1> 		push dword [bsHidden]
+   222                              <1> .gotoffs:
+   223                              <1> ;
+   224                              <1> ; Get disk drive parameters (don't trust the superblock.)  Don't do this for
+   225                              <1> ; floppy drives -- INT 13:08 on floppy drives will (may?) return info about
+   226                              <1> ; what the *drive* supports, not about the *media*.  Fortunately floppy disks
+   227                              <1> ; tend to have a fixed, well-defined geometry which is stored in the superblock.
+   228                              <1> ;
+   229                              <1> 		; DL == drive # still
+   230 000000E3 B408                <1> 		mov ah,08h
+   231 000000E5 E8E900              <1> 		call xint13
+   232 000000E8 7213                <1> 		jc no_driveparm
+   233 000000EA 20E4                <1> 		and ah,ah
+   234 000000EC 750F                <1> 		jnz no_driveparm
+   235 000000EE C1EA08              <1> 		shr dx,8
+   236 000000F1 42                  <1> 		inc dx			; Contains # of heads - 1
+   237 000000F2 8916[1A00]          <1> 		mov [bsHeads],dx
+   238 000000F6 83E13F              <1> 		and cx,3fh
+   239 000000F9 890E[1800]          <1> 		mov [bsSecPerTrack],cx
+   240                              <1> no_driveparm:
+   241                              <1> not_harddisk:
+   242                              <1> ;
+   243                              <1> ; Ready to enable interrupts, captain
+   244                              <1> ;
+   245 000000FD FB                  <1> 		sti
+   246                              <1> 
+   247                              <1> ;
+   248                              <1> ; Do we have EBIOS (EDD)?
+   249                              <1> ;
+   250                              <1> eddcheck:
+   251 000000FE BBAA55              <1> 		mov bx,55AAh
+   252 00000101 B441                <1> 		mov ah,41h		; EDD existence query
+   253 00000103 E8CB00              <1> 		call xint13
+   254 00000106 7210                <1> 		jc .noedd
+   255 00000108 81FB55AA            <1> 		cmp bx,0AA55h
+   256 0000010C 750A                <1> 		jne .noedd
+   257 0000010E F6C101              <1> 		test cl,1		; Extended disk access functionality set
+   258 00000111 7405                <1> 		jz .noedd
+   259                              <1> 		;
+   260                              <1> 		; We have EDD support...
+   261                              <1> 		;
+   262 00000113 C606[4601]00        <1> 		mov byte [getonesec.jmp+1],(getonesec_ebios-(getonesec.jmp+2))
+   263                              <1> .noedd:
+   264                              <1> 
+   265                              <1> ;
+   266                              <1> ; Load the first sector of LDLINUX.SYS; this used to be all proper
+   267                              <1> ; with parsing the superblock and root directory; it doesn't fit
+   268                              <1> ; together with EBIOS support, unfortunately.
+   269                              <1> ;
+   270                              <1> Sect1Load:
+   271 00000118 66B801000000        <1> 		mov eax,strict dword Sect1Ptr0_VAL	; 0xdeadbeef
+   272                              <1> Sect1Ptr0	equ $-4
+   273 0000011E 66BA00000000        <1> 		mov edx,strict dword Sect1Ptr1_VAL	; 0xfeedface
+   274                              <1> Sect1Ptr1	equ $-4
+   275 00000124 BB[0002]            <1> 		mov bx,ldlinux_sys	; Where to load it
+   276 00000127 E80E00              <1> 		call getonesec
+   277                              <1> 
+   278                              <1> 		; Some modicum of integrity checking
+   279 0000012A 66813E[0402]FF02B2- <1> 		cmp dword [ldlinux_magic+4],LDLINUX_MAGIC^HEXDATE
+   279 00000132 3E                  <1>
+   280 00000133 7574                <1> 		jne kaboom
+   281                              <1> 
+   282                              <1> 		; Go for it!
+   283 00000135 E9D000              <1> 		jmp ldlinux_ent
+   284                              <1> 
+   285                              <1> ;
+   286                              <1> ; getonesec: load a single disk linear sector EDX:EAX into the buffer
+   287                              <1> ;	     at ES:BX.
+   288                              <1> ;
+   289                              <1> ;            This routine assumes CS == DS == SS, and trashes most registers.
+   290                              <1> ;
+   291                              <1> ; Stylistic note: use "xchg" instead of "mov" when the source is a register
+   292                              <1> ; that is dead from that point; this saves space.  However, please keep
+   293                              <1> ; the order to dst,src to keep things sane.
+   294                              <1> ;
+   295                              <1> getonesec:
+   296 00000138 660306607B          <1> 		add eax,[Hidden]		; Add partition offset
+   297 0000013D 661316647B          <1> 		adc edx,[Hidden+4]
+   298 00000142 B91000              <1> 		mov cx,retry_count
+   299 00000145 EB2B                <1> .jmp:		jmp strict short getonesec_cbios
+   300                              <1> 
+   301                              <1> ;
+   302                              <1> ; getonesec_ebios:
+   303                              <1> ;
+   304                              <1> ; getonesec implementation for EBIOS (EDD)
+   305                              <1> ;
+   306                              <1> getonesec_ebios:
+   307                              <1> .retry:
+   308                              <1> 		; Form DAPA on stack
+   309 00000147 6652                <1> 		push edx
+   310 00000149 6650                <1> 		push eax
+   311 0000014B 06                  <1> 		push es
+   312 0000014C 53                  <1> 		push bx
+   313 0000014D 6A01                <1> 		push word 1
+   314 0000014F 6A10                <1> 		push word 16
+   315 00000151 89E6                <1> 		mov si,sp
+   316 00000153 6660                <1> 		pushad
+   317 00000155 B442                <1>                 mov ah,42h                      ; Extended Read
+   318 00000157 E87700              <1> 		call xint13
+   319 0000015A 6661                <1> 		popad
+   320 0000015C 8D6410              <1> 		lea sp,[si+16]			; Remove DAPA
+   321 0000015F 7201                <1> 		jc .error
+   322 00000161 C3                  <1>                 ret
+   323                              <1> 
+   324                              <1> .error:
+   325                              <1> 		; Some systems seem to get "stuck" in an error state when
+   326                              <1> 		; using EBIOS.  Doesn't happen when using CBIOS, which is
+   327                              <1> 		; good, since some other systems get timeout failures
+   328                              <1> 		; waiting for the floppy disk to spin up.
+   329                              <1> 
+   330 00000162 6660                <1> 		pushad				; Try resetting the device
+   331 00000164 31C0                <1> 		xor ax,ax
+   332 00000166 E86800              <1> 		call xint13
+   333 00000169 6661                <1> 		popad
+   334 0000016B E2DA                <1> 		loop .retry			; CX-- and jump if not zero
+   335                              <1> 
+   336                              <1> 		; Total failure.  Try falling back to CBIOS.
+   337 0000016D C606[4601]2B        <1> 		mov byte [getonesec.jmp+1],(getonesec_cbios-(getonesec.jmp+2))
+   338                              <1> 
+   339                              <1> ;
+   340                              <1> ; getonesec_cbios:
+   341                              <1> ;
+   342                              <1> ; getlinsec implementation for legacy CBIOS
+   343                              <1> ;
+   344                              <1> getonesec_cbios:
+   345                              <1> .retry:
+   346 00000172 6660                <1> 		pushad
+   347                              <1> 
+   348 00000174 660FB736[1800]      <1> 		movzx esi,word [bsSecPerTrack]
+   349 0000017A 660FB73E[1A00]      <1> 		movzx edi,word [bsHeads]
+   350                              <1> 		;
+   351                              <1> 		; Dividing by sectors to get (track,sector): we may have
+   352                              <1> 		; up to 2^18 tracks, so we need to use 32-bit arithmetric.
+   353                              <1> 		;
+   354 00000180 66F7F6              <1> 		div esi
+   355 00000183 31C9                <1> 		xor cx,cx
+   356 00000185 87CA                <1> 		xchg cx,dx		; CX <- sector index (0-based)
+   357                              <1> 					; EDX <- 0
+   358                              <1> 		; eax = track #
+   359 00000187 66F7F7              <1> 		div edi			; Convert track to head/cyl
+   360                              <1> 
+   361 0000018A 663DFF030000        <1> 		cmp eax,1023		; Outside the CHS range?
+   362 00000190 7717                <1> 		ja kaboom
+   363                              <1> 
+   364                              <1> 		;
+   365                              <1> 		; Now we have AX = cyl, DX = head, CX = sector (0-based),
+   366                              <1> 		; SI = bsSecPerTrack, ES:BX = data target
+   367                              <1> 		;
+   368 00000192 C0E406              <1> 		shl ah,6		; Because IBM was STOOPID
+   369                              <1> 					; and thought 8 bits were enough
+   370                              <1> 					; then thought 10 bits were enough...
+   371 00000195 41                  <1> 		inc cx			; Sector numbers are 1-based, sigh
+   372 00000196 08E1                <1> 		or cl,ah
+   373 00000198 88C5                <1> 		mov ch,al
+   374 0000019A 88D6                <1> 		mov dh,dl
+   375 0000019C B80102              <1> 		mov ax,0201h		; Read one sector
+   376 0000019F E82F00              <1> 		call xint13
+   377 000001A2 6661                <1> 		popad
+   378 000001A4 7201                <1> 		jc .error
+   379 000001A6 C3                  <1> 		ret
+   380                              <1> 
+   381                              <1> .error:
+   382 000001A7 E2C9                <1> 		loop .retry
+   383                              <1> 		; Fall through to disk_error
+   384                              <1> 
+   385                              <1> ;
+   386                              <1> ; kaboom: write a message and bail out.
+   387                              <1> ;
+   388                              <1> %ifdef BINFMT
+   389                              <1> 		global kaboom
+   390                              <1> %else
+   391                              <1> 		global kaboom:function hidden
+   392                              <1> %endif
+   393                              <1> disk_error:
+   394                              <1> kaboom:
+   395 000001A9 31F6                <1> 		xor si,si
+   396 000001AB 8ED6                <1> 		mov ss,si
+   397 000001AD BC687B              <1> 		mov sp,OrigFDCTabPtr	; Reset stack
+   398 000001B0 8EDE                <1> 		mov ds,si		; Reset data segment
+   399 000001B2 668F067800          <1> 		pop dword [fdctab]	; Restore FDC table
+   400                              <1> .patch:					; When we have full code, intercept here
+   401 000001B7 BE[DA01]            <1> 		mov si,bailmsg
+   402 000001BA AC                  <1> .loop:		lodsb
+   403 000001BB 20C0                <1> 		and al,al
+   404 000001BD 7409                <1>                 jz .done
+   405 000001BF B40E                <1> 		mov ah,0Eh		; Write to screen as TTY
+   406 000001C1 BB0700              <1> 		mov bx,0007h		; Attribute
+   407 000001C4 CD10                <1> 		int 10h
+   408 000001C6 EBF2                <1> 		jmp short .loop
+   409                              <1> 
+   410                              <1> .done:
+   411 000001C8 31C0                <1> 		xor ax,ax
+   412 000001CA CD16                <1> .again:		int 16h			; Wait for keypress
+   413                              <1> 					; NB: replaced by int 18h if
+   414                              <1> 					; chosen at install time..
+   415 000001CC CD19                <1> 		int 19h			; And try once more to boot...
+   416 000001CE F4                  <1> .norge:		hlt			; If int 19h returned; this is the end
+   417 000001CF EBFD                <1> 		jmp short .norge
+   418                              <1> 
+   419                              <1> ;
+   420                              <1> ; INT 13h wrapper function
+   421                              <1> ;
+   422                              <1> xint13:
+   423 000001D1 8A16747B            <1> 		mov dl,[DriveNumber]
+   424 000001D5 06                  <1> 		push es		; ES destroyed by INT 13h AH 08h
+   425 000001D6 CD13                <1> 		int 13h
+   426 000001D8 07                  <1> 		pop es
+   427 000001D9 C3                  <1> 		ret
+   428                              <1> 
+   429                              <1> ;
+   430                              <1> ; Error message on failure
+   431                              <1> ;
+   432 000001DA 426F6F74206572726F- <1> bailmsg:	db 'Boot error', 0Dh, 0Ah, 0
+   432 000001E3 720D0A00            <1>
+   433                              <1> 
+   434                              <1> 		; This fails if the boot sector overflowsg
+   435 000001E7 00<rept>            <1> 		zb 1F8h-($-$$)
+   436                              <1> 
+   437 000001F8 FE02B23E            <1> bs_magic	dd LDLINUX_MAGIC
+   438 000001FC 1837                <1> bs_link		dw (Sect1Load - bootsec) | BS_MAGIC_VER
+   439 000001FE 55AA                <1> bootsignature	dw 0xAA55
+   440                              <1> 
+   441                              <1> ;
+   442                              <1> ; ===========================================================================
+   443                              <1> ;  End of boot sector
+   444                              <1> ; ===========================================================================
+    67                                  
+    68                                  HEXDATE		equ 1
+    69                                  
+    70                                  		section .init
+    71                                  sector_1:
+    72                                  ldlinux_sys:
+    73                                  		alignz 8
+    74 00000200 FE02B23E                ldlinux_magic	dd LDLINUX_MAGIC
+    75 00000204 FF02B23E                		dd LDLINUX_MAGIC^HEXDATE
+    76                                  
+    77                                  
+    78                                  ldlinux_ent:
+    79                                  
+    80                                  get_geo:		; DL and ES ready
+    81 00000208 B408                    		mov ah,08h
+    82 0000020A BF0000                  		mov di,0
+    83 0000020D E8C1FF                  		call xint13
+    84                                  write_geo:
+    85 00000210 720E                    		jc .bad_geo
+    86 00000212 BE[4F03]                		mov si,s_chs
+    87 00000215 E84A01                  		call writestr_early
+    88 00000218 E89D00                  		call write_chs
+    89 0000021B E8DC00                  		call crlf
+    90 0000021E EB00                    		jmp short .done
+    91                                  .bad_geo:
+    92                                  .done:
+    93                                  
+    94 00000220 BB0080                  		mov bx,dbuf
+    95                                  get_h1c:		; 0,1,1
+    96 00000223 B90100                  		mov cx,0001h
+    97 00000226 B601                    		mov dh,01h
+    98 00000228 E86000                  		call getonesec_chs
+    99 0000022B E86D00                  		call write_chs_lba
+   100                                  get_c1c:		; 1,0,1
+   101 0000022E B90101                  		mov cx,0101h
+   102 00000231 B600                    		mov dh,00h
+   103 00000233 E85500                  		call getonesec_chs
+   104 00000236 E86200                  		call write_chs_lba
+   105                                  
+   106                                  
+   107                                  
+   108                                  ; Do we have EBIOS (EDD)?
+   109                                  ;
+   110                                  edd:
+   111                                  .check:
+   112 00000239 BBAA55                  		mov bx,55AAh
+   113 0000023C B441                    		mov ah,41h		; EDD existence query
+   114 0000023E E890FF                  		call xint13
+   115 00000241 723F                    		jc .noedd
+   116 00000243 81FB55AA                		cmp bx,0AA55h
+   117 00000247 7539                    		jne .noedd
+   118 00000249 F6C101                  		test cl,1		; Extended disk access functionality set
+   119 0000024C 7434                    		jz .noedd
+   120                                  		;
+   121                                  		; We have EDD support...
+   122                                  		;
+   123 0000024E BB0080                  		mov bx,dbuf	; ES should still be safe.
+   124 00000251 6631D2                  		xor edx,edx
+   125 00000254 66C706[4F03]454444-     		mov dword [s_chs],m_EDD_SP
+   125 0000025C 20                 
+   126                                  .get_lba63:
+   127 0000025D 66B83F000000            		mov eax,63	; Same length as mov al,64; movzx eax,al
+   128 00000263 E8E1FE                  		call getonesec_ebios
+   129 00000266 721A                    		jc .bad_edd	;read error
+   130 00000268 E87200                  		call write_edd_lba
+   131                                  .get_lba16065:
+   132 0000026B 66B8C13E0000            		mov eax,16065
+   133 00000271 E8D3FE                  		call getonesec_ebios
+   134 00000274 720C                    		jc .bad_edd	;read error
+   135 00000276 E86400                  		call write_edd_lba
+   136                                  .good_edd:
+   137 00000279 66C706[5603]454444-     		mov dword [s_type],m_EDD0
+   137 00000281 00                 
+   138                                  .bad_edd:
+   139                                  .noedd:
+   140                                  .end:
+   141                                  
+   142                                  write_final_type:
+   143 00000282 BE[5403]                		mov si,s_typespec
+   144 00000285 E8DA00                  		call writestr_early
+   145 00000288 E91EFF                  		jmp kaboom
+   146                                  
+   147                                  ;
+   148                                  ; getonesec_chs:
+   149                                  ;
+   150                                  ; CX,DH specifies CHS address
+   151                                  ;
+   152                                  getonesec_chs:	; We could use an xchg and get a loop
+   153                                  ; 		mov cx,retry_count
+   154                                  .retry:
+   155 0000028B 6660                    		pushad
+   156 0000028D B80102                  		mov ax,0201h		; Read one sector
+   157 00000290 E83EFF                  		call xint13
+   158 00000293 6661                    		popad
+   159 00000295 7201                    		jc .error
+   160 00000297 C3                      		ret
+   161                                  
+   162                                  .error:
+   163                                  ; 		loop .retry
+   164                                  		; Fall through to disk_error
+   165 00000298 E90EFF                  		jmp disk_error
+   166                                  
+   167                                  %include "geodsplib.inc"
+     1                              <1> ; -----------------------------------------------------------------------
+     2                              <1> ;
+     3                              <1> ;   Copyright 2010 Gene Cumm
+     4                              <1> ;
+     5                              <1> ;   Portions from diskstart.inc:
+     6                              <1> ;   Copyright 1994-2009 H. Peter Anvin - All Rights Reserved
+     7                              <1> ;   Copyright 2009-2010 Intel Corporation; author: H. Peter Anvin
+     8                              <1> ;
+     9                              <1> ;   This program is free software; you can redistribute it and/or modify
+    10                              <1> ;   it under the terms of the GNU General Public License as published by
+    11                              <1> ;   the Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+    12                              <1> ;   Boston MA 02110-1301, USA; either version 2 of the License, or
+    13                              <1> ;   (at your option) any later version; incorporated herein by reference.
+    14                              <1> ;
+    15                              <1> ; -----------------------------------------------------------------------
+    16                              <1> 
+    17                              <1> ;
+    18                              <1> ; geodsplib.inc
+    19                              <1> ;
+    20                              <1> ; Library file for geodsp*.asm
+    21                              <1> ;
+    22                              <1> 
+    23                              <1> 		; ES:BX points to the buffer with address
+    24                              <1> 		; DX,CX as they should be for INT13h,AH=02
+    25                              <1> 		; For now assume C<256
+    26                              <1> write_chs_lba:
+    27 0000029B 6660                <1> 		pushad
+    28 0000029D BE[4E03]            <1> 		mov si,s_atchs
+    29 000002A0 E8BF00              <1> 		call writestr_early
+    30 000002A3 E81200              <1> 		call write_chs
+    31 000002A6 B03A                <1> 		mov al,':'
+    32 000002A8 E85800              <1> 		call writechr
+    33 000002AB 26668B07            <1> 		mov eax,[es:bx]
+    34 000002AF E87700              <1> 		call writehex8
+    35 000002B2 E84500              <1> 		call crlf
+    36 000002B5 6661                <1> 		popad
+    37 000002B7 C3                  <1> 		ret
+    38                              <1> 
+    39                              <1> 		; DX,CX as they should be for INT13h,AH=02
+    40                              <1> 		; For now assume C<256
+    41                              <1> write_chs:
+    42 000002B8 6660                <1> 		pushad
+    43 000002BA 88E8                <1> 		mov al,ch
+    44 000002BC 88CC                <1> 		mov ah,cl
+    45 000002BE C0EC06              <1> 		shr ah,6
+    46 000002C1 E85800              <1> 		call writehex4
+    47 000002C4 B02C                <1> 		mov al,','
+    48 000002C6 E83A00              <1> 		call writechr
+    49 000002C9 88F0                <1> 		mov al,dh
+    50 000002CB E84100              <1> 		call writehex2
+    51 000002CE B02C                <1> 		mov al,','
+    52 000002D0 E83000              <1> 		call writechr
+    53 000002D3 88C8                <1> 		mov al,cl
+    54 000002D5 243F                <1> 		and al,3Fh
+    55 000002D7 E83500              <1> 		call writehex2
+    56 000002DA 6661                <1> 		popad
+    57 000002DC C3                  <1> 		ret
+    58                              <1> 
+    59                              <1> write_edd_lba:
+    60 000002DD 6660                <1> 		pushad
+    61 000002DF BE[4E03]            <1> 		mov si,s_atchs
+    62 000002E2 E87D00              <1> 		call writestr_early
+    63 000002E5 E84100              <1> 		call writehex8
+    64 000002E8 B03A                <1> 		mov al,':'
+    65 000002EA E81600              <1> 		call writechr
+    66 000002ED 26668B07            <1> 		mov eax,[es:bx]
+    67 000002F1 E83500              <1> 		call writehex8
+    68 000002F4 E80300              <1> 		call crlf
+    69 000002F7 6661                <1> 		popad
+    70 000002F9 C3                  <1> 		ret
+    71                              <1> 
+    72                              <1> 
+    73                              <1> crlf:
+    74 000002FA 56                  <1> 		push si
+    75 000002FB BE[5F03]            <1> 		mov si,s_crlf
+    76 000002FE E86100              <1> 		call writestr_early
+    77 00000301 5E                  <1> 		pop si
+    78 00000302 C3                  <1> 		ret
+    79                              <1> 
+    80                              <1> writechr:
+    81                              <1> writechr_early:
+    82 00000303 6660                <1> 		pushad
+    83 00000305 B40E                <1> 		mov ah,0Eh		; Write to screen as TTY
+    84 00000307 BB0700              <1> 		mov bx,0007h		; Attribute
+    85 0000030A CD10                <1> 		int 10h
+    86 0000030C 6661                <1> 		popad
+    87 0000030E C3                  <1> 		ret
+    88                              <1> 
+    89                              <1> %include "writehex.inc"
+     1                              <2> ;; -----------------------------------------------------------------------
+     2                              <2> ;;
+     3                              <2> ;;   Copyright 1994-2008 H. Peter Anvin - All Rights Reserved
+     4                              <2> ;;
+     5                              <2> ;;   This program is free software; you can redistribute it and/or modify
+     6                              <2> ;;   it under the terms of the GNU General Public License as published by
+     7                              <2> ;;   the Free Software Foundation, Inc., 53 Temple Place Ste 330,
+     8                              <2> ;;   Boston MA 02111-1307, USA; either version 2 of the License, or
+     9                              <2> ;;   (at your option) any later version; incorporated herein by reference.
+    10                              <2> ;;
+    11                              <2> ;; -----------------------------------------------------------------------
+    12                              <2> 
+    13                              <2> ;;
+    14                              <2> ;; writehex.inc
+    15                              <2> ;;
+    16                              <2> ;; Write hexadecimal numbers to the console
+    17                              <2> ;;
+    18                              <2> 
+    19                              <2> ;
+    20                              <2> ; writehex[248]: Write a hex number in (AL, AX, EAX) to the console
+    21                              <2> ;
+    22                              <2> writehex2:
+    23 0000030F 669C                <2> 		pushfd
+    24 00000311 6660                <2> 		pushad
+    25 00000313 66C1C018            <2> 		rol eax,24
+    26 00000317 B90200              <2> 		mov cx,2
+    27 0000031A EB14                <2> 		jmp short writehex_common
+    28                              <2> writehex4:
+    29 0000031C 669C                <2> 		pushfd
+    30 0000031E 6660                <2> 		pushad
+    31 00000320 66C1C010            <2> 		rol eax,16
+    32 00000324 B90400              <2> 		mov cx,4
+    33 00000327 EB07                <2> 		jmp short writehex_common
+    34                              <2> writehex8:
+    35 00000329 669C                <2> 		pushfd
+    36 0000032B 6660                <2> 		pushad
+    37 0000032D B90800              <2> 		mov cx,8
+    38                              <2> writehex_common:
+    39 00000330 66C1C004            <2> .loop:		rol eax,4
+    40 00000334 6650                <2> 		push eax
+    41 00000336 240F                <2> 		and al,0Fh
+    42 00000338 3C0A                <2> 		cmp al,10
+    43 0000033A 7304                <2> 		jae .high
+    44 0000033C 0430                <2> .low:		add al,'0'
+    45 0000033E EB02                <2> 		jmp short .ischar
+    46 00000340 0437                <2> .high:		add al,'A'-10
+    47 00000342 E8BEFF              <2> .ischar:	call writechr
+    48 00000345 6658                <2> 		pop eax
+    49 00000347 E2E7                <2> 		loop .loop
+    50 00000349 6661                <2> 		popad
+    51 0000034B 669D                <2> 		popfd
+    52 0000034D C3                  <2> 		ret
+    90                              <1> 
+    91 0000034E 40                  <1> s_atchs:	db '@'
+    92 0000034F 434853              <1> s_chs:		db 'CHS'
+    93 00000352 2000                <1> s_space:	db ' ', 0
+    94 00000354 443D                <1> s_typespec:	db 'D='
+    95 00000356 43485300            <1> s_type:		db 'CHS', 0
+    96 0000035A 0D0A656E64          <1> s_end:		db 0Dh, 0Ah, 'end'
+    97 0000035F 0D0A00              <1> s_crlf:		db 0Dh, 0Ah, 0
+    98                              <1> 
+    99                              <1> ; This indicates the general format of the last few bytes in the boot sector
+   100                              <1> BS_MAGIC_VER	equ 0x1b << 9
+   168                                  
+   169                                  ;
+   170                                  ;
+   171                                  ; writestr_early: write a null-terminated string to the console
+   172                                  ;	    This assumes we're on page 0.  This is only used for early
+   173                                  ;           messages, so it should be OK.
+   174                                  ;
+   175                                  writestr_early:
+   176 00000362 6660                    		pushad
+   177 00000364 AC                      .loop:		lodsb
+   178 00000365 20C0                    		and al,al
+   179 00000367 7409                                    jz .return
+   180 00000369 B40E                    		mov ah,0Eh		; Write to screen as TTY
+   181 0000036B BB0700                  		mov bx,0007h		; Attribute
+   182 0000036E CD10                    		int 10h
+   183 00000370 EBF2                    		jmp short .loop
+   184 00000372 6661                    .return:	popad
+   185 00000374 C3                      		ret
+   186                                  
+   187 00000375 00000000<rept>          SuperInfo:	zd 32			; The first 16 bytes expanded 8 times
+   188                                  
+   189                                  		; This fails if the sector overflowsg
+   190 000003F5 00<rept>                		zb 400h-($-$$)
+   191                                  end:
+   192                                  
+   193                                  		absolute 4*1Eh
+   194                                  fdctab		equ $
+   195 00000078 <res 00000002>          fdctab1		resw 1
+   196 0000007A <res 00000002>          fdctab2		resw 1

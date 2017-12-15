@@ -1,0 +1,79 @@
+
+pxelinux.elf:     file format elf32-i386
+
+Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+  0 .prefix       00000014  00000000  00000000  00001000  2**4
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+  1 .earlybss     0000280c  00001000  00001000  00002000  2**3
+                  ALLOC
+  2 .bss16        00000242  00003810  00003810  00002000  2**4
+                  ALLOC
+  3 .gentextnr    00000418  00003a80  00003a80  00002000  2**4
+                  ALLOC, CODE
+  4 .stack16      00001000  00006000  00006000  00002000  2**4
+                  ALLOC
+  5 .text16       000006fd  00007c00  00007c00  00001c00  2**2
+                  CONTENTS, ALLOC, LOAD, CODE
+  6 .textnr       000003c0  00008300  00008300  00002300  2**3
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+  7 .bcopyxx.text 00000147  000086c0  000086c0  000026c0  2**4
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+  8 .bcopyxx.data 00000036  00008810  00008810  00002810  2**4
+                  CONTENTS, ALLOC, LOAD, DATA
+  9 .data16       00000135  00008850  00008850  00002850  2**4
+                  CONTENTS, ALLOC, LOAD, DATA
+ 10 .adv          00000400  00008a00  00008a00  0000da00  2**9
+                  ALLOC
+ 11 .uibss        00000100  00008e00  00008e00  0000da00  2**4
+                  ALLOC
+ 12 .real_mode    00010000  00010000  00010000  00010000  2**16
+                  ALLOC
+ 13 .xfer_buf     00010000  00020000  00020000  00020000  2**16
+                  ALLOC
+ 14 .lowmem       000041e0  00030000  00030000  00020000  2**5
+                  ALLOC
+ 15 .text         00009c9c  00100000  00008990  00003000  2**4
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+ 16 .rodata       000009c7  00109ca0  00012630  0000cca0  2**5
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+ 17 .dynsym       00001930  0010a668  00012ff8  0000d668  2**2
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+ 18 .dynstr       000012a0  0010bf98  00014928  0000ef98  2**0
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+ 19 .gnu.hash     00000c2c  0010d238  00015bc8  00010238  2**2
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+ 20 .rel.dyn      000006f0  0010de64  000167f4  00010e64  2**2
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+ 21 .got          00000020  0010e554  00016ee4  00011554  2**2
+                  CONTENTS, ALLOC, LOAD, DATA
+ 22 .dynamic      00000098  0010e574  00016f04  00011574  2**2
+                  CONTENTS, ALLOC, LOAD, DATA
+ 23 .data         0000072c  0010e620  00016fa0  00011620  2**5
+                  CONTENTS, ALLOC, LOAD, DATA
+ 24 .bss          00204728  0010ed80  0010ed80  00011d80  2**5
+                  ALLOC
+ 25 .savedata     00002000  003134b0  003134b0  00011d80  2**4
+                  ALLOC
+ 26 .stack        00010000  00316000  003154b0  00012000  2**12
+                  ALLOC
+ 27 .debug_aranges 00001020  00000000  00000000  00011d50  2**3
+                  CONTENTS, READONLY, DEBUGGING
+ 28 .debug_pubnames 00000012  00000000  00000000  00012d70  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 29 .debug_info   0004a24b  00000000  00000000  00012d82  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 30 .debug_abbrev 0000c8f7  00000000  00000000  0005cfcd  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 31 .debug_line   00010464  00000000  00000000  000698c4  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 32 .debug_frame  00004674  00000000  00000000  00079d28  2**3
+                  CONTENTS, READONLY, DEBUGGING
+ 33 .debug_loc    0000ea8f  00000000  00000000  0007e39c  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 34 .debug_ranges 000004c0  00000000  00000000  0008ce2b  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 35 .debug_str    00005e98  00000000  00000000  0008d2eb  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 36 .comment      0000002d  00000000  00000000  00093183  2**0
+                  CONTENTS, READONLY

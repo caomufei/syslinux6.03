@@ -1,0 +1,79 @@
+
+isolinux-debug.elf:     file format elf32-i386
+
+Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+  0 .prefix       00000014  00000000  00000000  00001000  2**4
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+  1 .earlybss     000028bc  00001000  00001000  00002000  2**3
+                  ALLOC
+  2 .bss16        00000226  000038c0  000038c0  00002000  2**4
+                  ALLOC
+  3 .gentextnr    00000418  00003b00  00003b00  00002000  2**4
+                  ALLOC, CODE
+  4 .stack16      00001000  00006c00  00006c00  00001c00  2**4
+                  ALLOC
+  5 .init         00000800  00007c00  00007c00  00002c00  2**0
+                  CONTENTS, ALLOC, LOAD, CODE
+  6 .text16       00000540  00008400  00008400  00003400  2**0
+                  CONTENTS, ALLOC, LOAD, CODE
+  7 .textnr       00000360  00008940  00008940  00003940  2**3
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+  8 .bcopyxx.text 00000147  00008ca0  00008ca0  00003ca0  2**4
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+  9 .bcopyxx.data 00000036  00008df0  00008df0  00003df0  2**4
+                  CONTENTS, ALLOC, LOAD, DATA
+ 10 .data16       000000af  00008e30  00008e30  00003e30  2**4
+                  CONTENTS, ALLOC, LOAD, DATA
+ 11 .adv          00000400  00009000  00009000  0000d000  2**9
+                  ALLOC
+ 12 .uibss        00000100  00009400  00009400  0000d000  2**4
+                  ALLOC
+ 13 .real_mode    00010000  00010000  00010000  00010000  2**16
+                  ALLOC
+ 14 .xfer_buf     00010000  00020000  00020000  00020000  2**16
+                  ALLOC
+ 15 .lowmem       00002060  00030000  00030000  00020000  2**5
+                  ALLOC
+ 16 .text         000087d7  00100000  00008ee0  00004000  2**4
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+ 17 .rodata       000006c5  001087e0  000116c0  0000c7e0  2**5
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+ 18 .dynsym       000018a0  00108ea8  00011d88  0000cea8  2**2
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+ 19 .dynstr       0000124a  0010a748  00013628  0000e748  2**0
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+ 20 .gnu.hash     00000b10  0010b994  00014874  0000f994  2**2
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+ 21 .rel.dyn      00000610  0010c4a4  00015384  000104a4  2**2
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+ 22 .got          00000024  0010cab4  00015994  00010ab4  2**2
+                  CONTENTS, ALLOC, LOAD, DATA
+ 23 .dynamic      00000098  0010cad8  000159b8  00010ad8  2**2
+                  CONTENTS, ALLOC, LOAD, DATA
+ 24 .data         000006a8  0010cb80  00015a50  00010b80  2**5
+                  CONTENTS, ALLOC, LOAD, DATA
+ 25 .bss          00203dd8  0010d280  0010d280  00011280  2**5
+                  ALLOC
+ 26 .stack        00010000  00312000  00311058  00012000  2**12
+                  ALLOC
+ 27 .debug_aranges 00000fc8  00000000  00000000  00011228  2**3
+                  CONTENTS, READONLY, DEBUGGING
+ 28 .debug_pubnames 00000012  00000000  00000000  000121f0  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 29 .debug_info   0003f1bb  00000000  00000000  00012202  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 30 .debug_abbrev 0000b615  00000000  00000000  000513bd  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 31 .debug_line   0000f77b  00000000  00000000  0005c9d2  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 32 .debug_frame  00003ce4  00000000  00000000  0006c150  2**3
+                  CONTENTS, READONLY, DEBUGGING
+ 33 .debug_loc    0000c9c2  00000000  00000000  0006fe34  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 34 .debug_ranges 00000328  00000000  00000000  0007c7f6  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 35 .debug_str    0000520f  00000000  00000000  0007cb1e  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 36 .comment      0000002d  00000000  00000000  00081d2d  2**0
+                  CONTENTS, READONLY

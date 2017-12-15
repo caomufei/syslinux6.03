@@ -1,0 +1,544 @@
+     1                                  ; -----------------------------------------------------------------------
+     2                                  ;
+     3                                  ;   Copyright 2010 Gene Cumm
+     4                                  ;
+     5                                  ;   Portions from diskstart.inc:
+     6                                  ;   Copyright 1994-2009 H. Peter Anvin - All Rights Reserved
+     7                                  ;   Copyright 2009-2010 Intel Corporation; author: H. Peter Anvin
+     8                                  ;
+     9                                  ;   This program is free software; you can redistribute it and/or modify
+    10                                  ;   it under the terms of the GNU General Public License as published by
+    11                                  ;   the Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+    12                                  ;   Boston MA 02110-1301, USA; either version 2 of the License, or
+    13                                  ;   (at your option) any later version; incorporated herein by reference.
+    14                                  ;
+    15                                  ; -----------------------------------------------------------------------
+    16                                  
+    17                                  ;
+    18                                  ; geodsp1s.asm
+    19                                  ;
+    20                                  ; Display geometry translation info for diagnosing misconceptions
+    21                                  ; 1 sector variant
+    22                                  ;
+    23                                  ;	nasm -Ox -f bin -o geodsp.bin -l geodsp.lst geodsp.asm
+    24                                  ;
+    25                                  ;	nasm -Ox -f elf -o geodsp.o -l geodsp.lst geodsp.asm
+    26                                  ;	ld -m elf_i386  -T syslinux.ld -M -o geodsp.elf geodsp.o > geodsp.map
+    27                                  ;	objcopy -O binary geodsp.elf geodsp.raw
+    28                                  ;
+    29                                  ;	# OF=/dev/sdb
+    30                                  ;	# dd if=core/geodsp.bin of=$OF
+    31                                  ;	# dd skip=1 seek=1 if=../dbg/lba-img/lba-img.bin of=$OF
+    32                                  ;	# eject $OF
+    33                                  ;	# dd count=$() if=/dev/zero of=$OF
+    34                                  ;
+    35                                  ;	# OF=geo-2.255.63.i
+    36                                  ;	# (dd if=core/geodsp.bin; dd skip=1 if=../dbg/lba-img/lba-img.bin; dd count=$((2*255*63 - 256*63 - 1)) if=/dev/zero )|dd of=$OF
+    37                                  ;	# OF=geo-20.16.63.i
+    38                                  ;	# (dd if=core/geodsp.bin; dd skip=1 if=../dbg/lba-img/lba-img.bin; dd count=$((40*16*63 - 256*63 - 1)) if=/dev/zero )|dd of=$OF
+    39                                  ;
+    40                                  
+    41                                  %include "macros.inc"
+     1                              <1> ;; -----------------------------------------------------------------------
+     2                              <1> ;;
+     3                              <1> ;;   Copyright 1994-2008 H. Peter Anvin - All Rights Reserved
+     4                              <1> ;;   Copyright 2009 Intel Corporation; author: H. Peter Anvin
+     5                              <1> ;;
+     6                              <1> ;;   This program is free software; you can redistribute it and/or modify
+     7                              <1> ;;   it under the terms of the GNU General Public License as published by
+     8                              <1> ;;   the Free Software Foundation, Inc., 53 Temple Place Ste 330,
+     9                              <1> ;;   Boston MA 02111-1307, USA; either version 2 of the License, or
+    10                              <1> ;;   (at your option) any later version; incorporated herein by reference.
+    11                              <1> ;;
+    12                              <1> ;; -----------------------------------------------------------------------
+    13                              <1> 
+    14                              <1> ;;
+    15                              <1> ;; macros.inc
+    16                              <1> ;;
+    17                              <1> ;; Convenient macros
+    18                              <1> ;;
+    19                              <1> 
+    20                              <1> %ifndef _MACROS_INC
+    21                              <1> %define _MACROS_INC
+    22                              <1> 
+    23                              <1> ;
+    24                              <1> ; Identify the module we're compiling; the "correct" should be defined
+    25                              <1> ; in the module itself to 1
+    26                              <1> ;
+    27                              <1> %ifdef IS_SYSLINUX
+    28                              <1>  %define MY_NAME 'SYSLINUX'
+    29                              <1> %else
+    30                              <1>  %define IS_SYSLINUX 0
+    31                              <1> %endif
+    32                              <1> %ifdef IS_PXELINUX
+    33                              <1>  %define MY_NAME 'PXELINUX'
+    34                              <1>  %if IS_LPXELINUX > 0
+    35                              <1>   %define MY_TYPE 'lwIP'
+    36                              <1>  %else
+    37                              <1>   %define MY_TYPE 'PXE'
+    38                              <1>  %endif
+    39                              <1> %else
+    40                              <1>  %define IS_PXELINUX 0
+    41                              <1> %endif
+    42                              <1> %ifdef IS_ISOLINUX
+    43                              <1>  %define MY_NAME 'ISOLINUX'
+    44                              <1> %else
+    45                              <1>  %define IS_ISOLINUX 0
+    46                              <1> %endif
+    47                              <1> %ifdef IS_EXTLINUX
+    48                              <1>  %define MY_NAME 'EXTLINUX'
+    49                              <1> %else
+    50                              <1>  %define IS_EXTLINUX 0
+    51                              <1> %endif
+    52                              <1> 
+    53                              <1> ;
+    54                              <1> ; Macros similar to res[bwd], but which works in the code segment (after
+    55                              <1> ; section .text16) or the data segment (section .data16)
+    56                              <1> ;
+    57                              <1> %macro	zb	1.nolist
+    58                              <1> 	times %1 db 0
+    59                              <1> %endmacro
+    60                              <1> 
+    61                              <1> %macro	zw	1.nolist
+    62                              <1> 	times %1 dw 0
+    63                              <1> %endmacro
+    64                              <1> 
+    65                              <1> %macro	zd	1.nolist
+    66                              <1> 	times %1 dd 0
+    67                              <1> %endmacro
+    68                              <1> 
+    69                              <1> ;
+    70                              <1> ; Align with zero bytes in a progbits segment
+    71                              <1> ;
+    72                              <1> %macro	alignz	1.nolist
+    73                              <1> 	times (((%1) - (($-$$) % (%1))) % (%1)) db 0
+    74                              <1> %endmacro
+    75                              <1> 
+    76                              <1> ;
+    77                              <1> ; Macro to emit an unsigned decimal number as a string
+    78                              <1> ;
+    79                              <1> %macro asciidec	1.nolist
+    80                              <1>   %ifndef DEPEND	; Not safe for "depend"
+    81                              <1>     %push asciidec
+    82                              <1>       %assign %$v %1
+    83                              <1>       %if %$v == 0
+    84                              <1>         db '0'
+    85                              <1>       %else
+    86                              <1>         %assign %$dcount 0
+    87                              <1>         %assign %$n %$v
+    88                              <1>         %assign %$d 1
+    89                              <1>         %rep 20
+    90                              <1>           %if %$n != 0
+    91                              <1>             %assign %$dcount %$dcount + 1
+    92                              <1>             %assign %$n %$n / 10
+    93                              <1>             %assign %$d %$d * 10
+    94                              <1>           %endif
+    95                              <1>         %endrep
+    96                              <1>         %rep %$dcount
+    97                              <1> 	  %assign %$d %$d / 10
+    98                              <1>           db ((%$v / %$d) % 10) + '0'
+    99                              <1>         %endrep
+   100                              <1>       %endif
+   101                              <1>     %pop
+   102                              <1>   %endif
+   103                              <1> %endmacro
+   104                              <1> 
+   105                              <1> ;
+   106                              <1> ; Macros for network byte order of constants
+   107                              <1> ;
+   108                              <1> %define htons(x)  ( ( ((x) & 0FFh) << 8 ) + ( ((x) & 0FF00h) >> 8 ) )
+   109                              <1> %define ntohs(x) htons(x)
+   110                              <1> %define htonl(x)  ( ( ((x) & 0FFh) << 24) + ( ((x) & 0FF00h) << 8 ) + ( ((x) & 0FF0000h) >> 8 ) + ( ((x) & 0FF000000h) >> 24) )
+   111                              <1> %define ntohl(x) htonl(x)
+   112                              <1> 
+   113                              <1> ;
+   114                              <1> ; ASCII
+   115                              <1> ;
+   116                              <1> CR		equ 13		; Carriage Return
+   117                              <1> LF		equ 10		; Line Feed
+   118                              <1> FF		equ 12		; Form Feed
+   119                              <1> BS		equ  8		; Backspace
+   120                              <1> 
+   121                              <1> %endif ; _MACROS_INC
+    42                                  ; %include "layout.inc"
+    43                                  
+    44                                  ; 		global STACK_LEN, STACK_TOP, STACK_BASE
+    45                                  ; STACK_LEN	equ 4096
+    46                                  STACK_TOP	equ 7c00h
+    47                                  ; STACK_BASE	equ STACK_TOP - STACK_LEN
+    48                                  
+    49                                  StackBuf	equ STACK_TOP-44-92	; Start the stack here (grow down - 4K)
+    50                                  DriveNumber	equ StackBuf-4		; Drive number
+    51                                  m_CHS0		equ 00534843h		;'CHS',0
+    52                                  m_EDD0		equ 00444445h		;'EDD',0
+    53                                  m_EDD_SP	equ 20444445h		;'EDD '
+    54                                  retry_count	equ 16
+    55                                  dbuf		equ 8000h
+    56                                  int13_ret	equ 7e00h
+    57                                  
+    58                                  
+    59                                  
+    60                                  ; 		extern	real_mode_seg
+    61                                  ; 		section .real_mode	write nobits align=65536
+    62                                  ; 		global	core_real_mode
+    63                                  ; core_real_mode	resb 65536
+    64                                  ; 		extern	xfer_buf_seg
+    65                                  ; 		section .xfer_buf	write nobits align=65536
+    66                                  ; 		global	core_xfer_buf
+    67                                  ; core_xfer_buf	resb 65536
+    68                                  
+    69                                  		section .text
+    70                                  		org STACK_TOP
+    71                                  
+    72                                  
+    73                                  		global _start
+    74                                  bootsec		equ $
+    75                                  _start:
+    76                                  			; In case we want to pull more of the standard diskstart stuff in
+    77                                  ; 		jmp short start		; 2 bytes
+    78                                  ; 		nop			; 1 byte
+    79                                  start:
+    80 00000000 FA                      		cli
+    81 00000001 FC                      		cld
+    82 00000002 31C9                    		xor cx,cx
+    83 00000004 8ED1                    		mov ss,cx
+    84 00000006 BC767B                  		mov sp,StackBuf-2	; Just below BSS (-2 for alignment)
+    85 00000009 52                      		push dx			; Save drive number (in DL)
+    86                                  			; Kill everything else and let the BIOS sort it out later
+    87 0000000A 8EC1                    		mov es,cx
+    88 0000000C 8ED9                    		mov ds,cx
+    89 0000000E FB                      		sti
+    90                                  
+    91                                  get_geo:		; DL and ES ready
+    92 0000000F B408                    		mov ah,08h
+    93 00000011 BF0000                  		mov di,0
+    94 00000014 CD13                    		int 13h
+    95                                  write_geo:
+    96 00000016 720E                    		jc .bad_geo
+    97 00000018 BE[A801]                		mov si,s_chs
+    98 0000001B E8C700                  		call writestr_early
+    99 0000001E E8F000                  		call write_chs
+   100 00000021 E82F01                  		call crlf
+   101 00000024 EB00                    		jmp short .done
+   102                                  .bad_geo:
+   103                                  .done:
+   104                                  
+   105 00000026 BB0080                  		mov bx,dbuf
+   106                                  get_h1c:		; 0,1,1
+   107 00000029 B90100                  		mov cx,0001h
+   108 0000002C B601                    		mov dh,01h
+   109 0000002E E88D00                  		call getonesec_chs
+   110 00000031 E8C000                  		call write_chs_lba
+   111                                  get_c1c:		; 1,0,1
+   112 00000034 B90101                  		mov cx,0101h
+   113 00000037 B600                    		mov dh,00h
+   114 00000039 E88200                  		call getonesec_chs
+   115 0000003C E8B500                  		call write_chs_lba
+   116                                  
+   117                                  ;
+   118                                  ; Do we have EBIOS (EDD)?
+   119                                  ;
+   120                                  edd:
+   121                                  .check:
+   122 0000003F BBAA55                  		mov bx,55AAh
+   123 00000042 B441                    		mov ah,41h		; EDD existence query
+   124 00000044 8A16747B                		mov dl,[DriveNumber]
+   125 00000048 CD13                    		int 13h
+   126 0000004A 723F                    		jc .noedd
+   127 0000004C 81FB55AA                		cmp bx,0AA55h
+   128 00000050 7539                    		jne .noedd
+   129 00000052 F6C101                  		test cl,1		; Extended disk access functionality set
+   130 00000055 7434                    		jz .noedd
+   131                                  		;
+   132                                  		; We have EDD support...
+   133                                  		;
+   134 00000057 BB0080                  		mov bx,dbuf
+   135 0000005A 6631D2                  		xor edx,edx
+   136 0000005D 66C706[A801]454444-     		mov dword [s_chs],m_EDD_SP
+   136 00000065 20                 
+   137                                  .get_lba63:
+   138 00000066 66B83F000000            		mov eax,63	; Same length as mov al,64; movzx eax,al
+   139 0000006C E82400                  		call getonesec_ebios
+   140 0000006F 721A                    		jc .bad_edd	;read error
+   141 00000071 E8C200                  		call write_edd_lba
+   142                                  .get_lba16065:
+   143 00000074 66B8C13E0000            		mov eax,16065
+   144 0000007A E81600                  		call getonesec_ebios
+   145 0000007D 720C                    		jc .bad_edd	;read error
+   146 0000007F E8B400                  		call write_edd_lba
+   147                                  .good_edd:
+   148 00000082 66C706[AF01]454444-     		mov dword [s_type],m_EDD0
+   148 0000008A 00                 
+   149                                  .bad_edd:
+   150                                  .noedd:
+   151                                  .end:
+   152                                  
+   153                                  write_final_type:
+   154 0000008B BE[AD01]                		mov si,s_typespec
+   155 0000008E E85400                  		call writestr_early
+   156                                  
+   157 00000091 EB38                    		jmp short kaboom
+   158                                  
+   159                                  ;
+   160                                  ; getonesec_ebios:
+   161                                  ;
+   162                                  ; getonesec implementation for EBIOS (EDD)
+   163                                  ;
+   164                                  getonesec_ebios:
+   165 00000093 B91000                  		mov cx,retry_count
+   166                                  .retry:
+   167                                  		; Form DAPA on stack
+   168 00000096 6652                    		push edx
+   169 00000098 6650                    		push eax
+   170 0000009A 06                      		push es
+   171 0000009B 53                      		push bx
+   172 0000009C 6A01                    		push word 1
+   173 0000009E 6A10                    		push word 16
+   174 000000A0 89E6                    		mov si,sp
+   175 000000A2 6660                    		pushad
+   176 000000A4 B442                                    mov ah,42h                      ; Extended Read
+   177 000000A6 E83200                  		call xint13
+   178 000000A9 6661                    		popad
+   179 000000AB 8D6410                  		lea sp,[si+16]			; Remove DAPA
+   180 000000AE 7201                    		jc .error
+   181 000000B0 C3                                      ret
+   182                                  
+   183                                  .error:
+   184                                  		; Some systems seem to get "stuck" in an error state when
+   185                                  		; using EBIOS.  Doesn't happen when using CBIOS, which is
+   186                                  		; good, since some other systems get timeout failures
+   187                                  		; waiting for the floppy disk to spin up.
+   188                                  
+   189 000000B1 6660                    		pushad				; Try resetting the device
+   190 000000B3 31C0                    		xor ax,ax
+   191 000000B5 E82300                  		call xint13
+   192 000000B8 6661                    		popad
+   193 000000BA E2DA                    		loop .retry			; CX-- and jump if not zero
+   194                                  
+   195                                  		; Total failure.
+   196 000000BC F9                      		stc
+   197 000000BD C3                      		ret
+   198                                  
+   199                                  ;
+   200                                  ; getonesec_chs:
+   201                                  ;
+   202                                  ; CX,DH specifies CHS address
+   203                                  ;
+   204                                  getonesec_chs:	; We could use an xchg and get a loop
+   205                                  ; 		mov cx,retry_count
+   206                                  .retry:
+   207 000000BE 6660                    		pushad
+   208 000000C0 B80102                  		mov ax,0201h		; Read one sector
+   209 000000C3 E81500                  		call xint13
+   210 000000C6 6661                    		popad
+   211 000000C8 7201                    		jc .error
+   212 000000CA C3                      		ret
+   213                                  
+   214                                  .error:
+   215                                  ; 		loop .retry
+   216                                  		; Fall through to disk_error
+   217                                  ;
+   218                                  ; kaboom: write a message and bail out.
+   219                                  ;
+   220                                  		global kaboom
+   221                                  disk_error:
+   222                                  kaboom:
+   223                                  .patch:
+   224 000000CB BE[B301]                		mov si,bailmsg
+   225 000000CE E81400                  		call writestr_early
+   226 000000D1 6631C0                  		xor eax,eax
+   227 000000D4 CD16                    .again:		int 16h			; Wait for keypress
+   228                                  					; NB: replaced by int 18h if
+   229                                  					; chosen at install time..
+   230 000000D6 CD19                    		int 19h			; And try once more to boot...
+   231 000000D8 F4                      .norge:		hlt			; If int 19h returned; this is the end
+   232 000000D9 EBFD                    		jmp short .norge
+   233                                  
+   234                                  ;
+   235                                  ; INT 13h wrapper function
+   236                                  ;
+   237                                  xint13:
+   238 000000DB 8A16747B                                mov dl,[DriveNumber]
+   239 000000DF CD13                    		int 13h
+   240 000000E1 A3007E                  		mov [int13_ret],ax
+   241 000000E4 C3                      		ret
+   242                                  
+   243                                  ;
+   244                                  ;
+   245                                  ; writestr_early: write a null-terminated string to the console
+   246                                  ;	    This assumes we're on page 0.  This is only used for early
+   247                                  ;           messages, so it should be OK.
+   248                                  ;
+   249                                  writestr_early:
+   250 000000E5 6660                    		pushad
+   251 000000E7 AC                      .loop:		lodsb
+   252 000000E8 20C0                    		and al,al
+   253 000000EA 7405                                    jz .return
+   254 000000EC E86D00                  		call writechr
+   255 000000EF EBF6                    		jmp short .loop
+   256 000000F1 6661                    .return:	popad
+   257 000000F3 C3                      		ret
+   258                                  
+   259                                  %include "geodsplib.inc"
+     1                              <1> ; -----------------------------------------------------------------------
+     2                              <1> ;
+     3                              <1> ;   Copyright 2010 Gene Cumm
+     4                              <1> ;
+     5                              <1> ;   Portions from diskstart.inc:
+     6                              <1> ;   Copyright 1994-2009 H. Peter Anvin - All Rights Reserved
+     7                              <1> ;   Copyright 2009-2010 Intel Corporation; author: H. Peter Anvin
+     8                              <1> ;
+     9                              <1> ;   This program is free software; you can redistribute it and/or modify
+    10                              <1> ;   it under the terms of the GNU General Public License as published by
+    11                              <1> ;   the Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+    12                              <1> ;   Boston MA 02110-1301, USA; either version 2 of the License, or
+    13                              <1> ;   (at your option) any later version; incorporated herein by reference.
+    14                              <1> ;
+    15                              <1> ; -----------------------------------------------------------------------
+    16                              <1> 
+    17                              <1> ;
+    18                              <1> ; geodsplib.inc
+    19                              <1> ;
+    20                              <1> ; Library file for geodsp*.asm
+    21                              <1> ;
+    22                              <1> 
+    23                              <1> 		; ES:BX points to the buffer with address
+    24                              <1> 		; DX,CX as they should be for INT13h,AH=02
+    25                              <1> 		; For now assume C<256
+    26                              <1> write_chs_lba:
+    27 000000F4 6660                <1> 		pushad
+    28 000000F6 BE[A701]            <1> 		mov si,s_atchs
+    29 000000F9 E8E9FF              <1> 		call writestr_early
+    30 000000FC E81200              <1> 		call write_chs
+    31 000000FF B03A                <1> 		mov al,':'
+    32 00000101 E85800              <1> 		call writechr
+    33 00000104 26668B07            <1> 		mov eax,[es:bx]
+    34 00000108 E87700              <1> 		call writehex8
+    35 0000010B E84500              <1> 		call crlf
+    36 0000010E 6661                <1> 		popad
+    37 00000110 C3                  <1> 		ret
+    38                              <1> 
+    39                              <1> 		; DX,CX as they should be for INT13h,AH=02
+    40                              <1> 		; For now assume C<256
+    41                              <1> write_chs:
+    42 00000111 6660                <1> 		pushad
+    43 00000113 88E8                <1> 		mov al,ch
+    44 00000115 88CC                <1> 		mov ah,cl
+    45 00000117 C0EC06              <1> 		shr ah,6
+    46 0000011A E85800              <1> 		call writehex4
+    47 0000011D B02C                <1> 		mov al,','
+    48 0000011F E83A00              <1> 		call writechr
+    49 00000122 88F0                <1> 		mov al,dh
+    50 00000124 E84100              <1> 		call writehex2
+    51 00000127 B02C                <1> 		mov al,','
+    52 00000129 E83000              <1> 		call writechr
+    53 0000012C 88C8                <1> 		mov al,cl
+    54 0000012E 243F                <1> 		and al,3Fh
+    55 00000130 E83500              <1> 		call writehex2
+    56 00000133 6661                <1> 		popad
+    57 00000135 C3                  <1> 		ret
+    58                              <1> 
+    59                              <1> write_edd_lba:
+    60 00000136 6660                <1> 		pushad
+    61 00000138 BE[A701]            <1> 		mov si,s_atchs
+    62 0000013B E8A7FF              <1> 		call writestr_early
+    63 0000013E E84100              <1> 		call writehex8
+    64 00000141 B03A                <1> 		mov al,':'
+    65 00000143 E81600              <1> 		call writechr
+    66 00000146 26668B07            <1> 		mov eax,[es:bx]
+    67 0000014A E83500              <1> 		call writehex8
+    68 0000014D E80300              <1> 		call crlf
+    69 00000150 6661                <1> 		popad
+    70 00000152 C3                  <1> 		ret
+    71                              <1> 
+    72                              <1> 
+    73                              <1> crlf:
+    74 00000153 56                  <1> 		push si
+    75 00000154 BE[B801]            <1> 		mov si,s_crlf
+    76 00000157 E88BFF              <1> 		call writestr_early
+    77 0000015A 5E                  <1> 		pop si
+    78 0000015B C3                  <1> 		ret
+    79                              <1> 
+    80                              <1> writechr:
+    81                              <1> writechr_early:
+    82 0000015C 6660                <1> 		pushad
+    83 0000015E B40E                <1> 		mov ah,0Eh		; Write to screen as TTY
+    84 00000160 BB0700              <1> 		mov bx,0007h		; Attribute
+    85 00000163 CD10                <1> 		int 10h
+    86 00000165 6661                <1> 		popad
+    87 00000167 C3                  <1> 		ret
+    88                              <1> 
+    89                              <1> %include "writehex.inc"
+     1                              <2> ;; -----------------------------------------------------------------------
+     2                              <2> ;;
+     3                              <2> ;;   Copyright 1994-2008 H. Peter Anvin - All Rights Reserved
+     4                              <2> ;;
+     5                              <2> ;;   This program is free software; you can redistribute it and/or modify
+     6                              <2> ;;   it under the terms of the GNU General Public License as published by
+     7                              <2> ;;   the Free Software Foundation, Inc., 53 Temple Place Ste 330,
+     8                              <2> ;;   Boston MA 02111-1307, USA; either version 2 of the License, or
+     9                              <2> ;;   (at your option) any later version; incorporated herein by reference.
+    10                              <2> ;;
+    11                              <2> ;; -----------------------------------------------------------------------
+    12                              <2> 
+    13                              <2> ;;
+    14                              <2> ;; writehex.inc
+    15                              <2> ;;
+    16                              <2> ;; Write hexadecimal numbers to the console
+    17                              <2> ;;
+    18                              <2> 
+    19                              <2> ;
+    20                              <2> ; writehex[248]: Write a hex number in (AL, AX, EAX) to the console
+    21                              <2> ;
+    22                              <2> writehex2:
+    23 00000168 669C                <2> 		pushfd
+    24 0000016A 6660                <2> 		pushad
+    25 0000016C 66C1C018            <2> 		rol eax,24
+    26 00000170 B90200              <2> 		mov cx,2
+    27 00000173 EB14                <2> 		jmp short writehex_common
+    28                              <2> writehex4:
+    29 00000175 669C                <2> 		pushfd
+    30 00000177 6660                <2> 		pushad
+    31 00000179 66C1C010            <2> 		rol eax,16
+    32 0000017D B90400              <2> 		mov cx,4
+    33 00000180 EB07                <2> 		jmp short writehex_common
+    34                              <2> writehex8:
+    35 00000182 669C                <2> 		pushfd
+    36 00000184 6660                <2> 		pushad
+    37 00000186 B90800              <2> 		mov cx,8
+    38                              <2> writehex_common:
+    39 00000189 66C1C004            <2> .loop:		rol eax,4
+    40 0000018D 6650                <2> 		push eax
+    41 0000018F 240F                <2> 		and al,0Fh
+    42 00000191 3C0A                <2> 		cmp al,10
+    43 00000193 7304                <2> 		jae .high
+    44 00000195 0430                <2> .low:		add al,'0'
+    45 00000197 EB02                <2> 		jmp short .ischar
+    46 00000199 0437                <2> .high:		add al,'A'-10
+    47 0000019B E8BEFF              <2> .ischar:	call writechr
+    48 0000019E 6658                <2> 		pop eax
+    49 000001A0 E2E7                <2> 		loop .loop
+    50 000001A2 6661                <2> 		popad
+    51 000001A4 669D                <2> 		popfd
+    52 000001A6 C3                  <2> 		ret
+    90                              <1> 
+    91 000001A7 40                  <1> s_atchs:	db '@'
+    92 000001A8 434853              <1> s_chs:		db 'CHS'
+    93 000001AB 2000                <1> s_space:	db ' ', 0
+    94 000001AD 443D                <1> s_typespec:	db 'D='
+    95 000001AF 43485300            <1> s_type:		db 'CHS', 0
+    96 000001B3 0D0A656E64          <1> s_end:		db 0Dh, 0Ah, 'end'
+    97 000001B8 0D0A00              <1> s_crlf:		db 0Dh, 0Ah, 0
+    98                              <1> 
+    99                              <1> ; This indicates the general format of the last few bytes in the boot sector
+   100                              <1> BS_MAGIC_VER	equ 0x1b << 9
+   260                                  bailmsg		equ s_end
+   261                                  
+   262                                  		; This fails if the boot sector overflowsg
+   263 000001BB 00<rept>                		zb 1BEh-($-$$)
+   264                                  
+   265 000001BE 00<rept>                ptable		zb 40h		; Partition table
+   266                                  
+   267 000001FE 55AA                    bootsignature	dw 0xAA55
+   268                                  
+   269                                  sector_2:

@@ -1,0 +1,79 @@
+
+ldlinux.elf:     file format elf32-i386
+
+Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+  0 .prefix       00000014  00000000  00000000  00001000  2**4
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+  1 .earlybss     0000280c  00001000  00001000  00002000  2**3
+                  ALLOC
+  2 .bss16        000001a2  00003810  00003810  00002000  2**4
+                  ALLOC
+  3 .gentextnr    00000418  00003a00  00003a00  00002000  2**4
+                  ALLOC, CODE
+  4 .stack16      00001000  00006c00  00006c00  00001c00  2**4
+                  ALLOC
+  5 .init         00000d6e  00007c00  00007c00  00002c00  2**0
+                  CONTENTS, ALLOC, LOAD, CODE
+  6 .text16       000005d3  0000896e  0000896e  0000396e  2**0
+                  CONTENTS, ALLOC, LOAD, CODE
+  7 .textnr       00000360  00008f50  00008f50  00003f50  2**3
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+  8 .bcopyxx.text 00000147  000092b0  000092b0  000042b0  2**4
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+  9 .bcopyxx.data 00000036  00009400  00009400  00004400  2**4
+                  CONTENTS, ALLOC, LOAD, DATA
+ 10 .data16       00000320  00009440  00009440  00004440  2**4
+                  CONTENTS, ALLOC, LOAD, DATA
+ 11 .adv          00000400  00009800  00009800  00015800  2**9
+                  ALLOC
+ 12 .uibss        00000100  00009c00  00009c00  00015800  2**4
+                  ALLOC
+ 13 .real_mode    00010000  00010000  00010000  00020000  2**16
+                  ALLOC
+ 14 .xfer_buf     00010000  00020000  00020000  00020000  2**16
+                  ALLOC
+ 15 .lowmem       00002060  00030000  00030000  00020000  2**5
+                  ALLOC
+ 16 .text         0000fb55  00100000  00009760  00005000  2**4
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+ 17 .rodata       00001755  0010fb60  000192c0  00014b60  2**5
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+ 18 .dynsym       00001850  001112b8  0001aa18  000162b8  2**2
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+ 19 .dynstr       0000121b  00112b08  0001c268  00017b08  2**0
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+ 20 .gnu.hash     00000afc  00113d24  0001d484  00018d24  2**2
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+ 21 .rel.dyn      00000808  00114820  0001df80  00019820  2**2
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+ 22 .got          00000024  00115028  0001e788  0001a028  2**2
+                  CONTENTS, ALLOC, LOAD, DATA
+ 23 .dynamic      00000098  0011504c  0001e7ac  0001a04c  2**2
+                  CONTENTS, ALLOC, LOAD, DATA
+ 24 .data         00000888  00115100  0001e850  0001a100  2**5
+                  CONTENTS, ALLOC, LOAD, DATA
+ 25 .bss          00205018  00115a00  00115a00  0001aa00  2**5
+                  ALLOC
+ 26 .stack        00010000  0031b000  0031aa18  0001b000  2**12
+                  ALLOC
+ 27 .debug_aranges 00001110  00000000  00000000  0001a988  2**3
+                  CONTENTS, READONLY, DEBUGGING
+ 28 .debug_pubnames 00000012  00000000  00000000  0001ba98  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 29 .debug_info   00054b97  00000000  00000000  0001baaa  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 30 .debug_abbrev 0000dcfa  00000000  00000000  00070641  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 31 .debug_line   0001278f  00000000  00000000  0007e33b  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 32 .debug_frame  000059b8  00000000  00000000  00090ad0  2**3
+                  CONTENTS, READONLY, DEBUGGING
+ 33 .debug_loc    00016f43  00000000  00000000  00096488  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 34 .debug_ranges 00000498  00000000  00000000  000ad3cb  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 35 .debug_str    000083cd  00000000  00000000  000ad863  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 36 .comment      0000002d  00000000  00000000  000b5c30  2**0
+                  CONTENTS, READONLY

@@ -1,0 +1,32 @@
+disk/msdos.o: \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/disk/msdos.c \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/../include/stdlib.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/../include/klibc/extern.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/../include/klibc/compiler.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/../include/stddef.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/../include/bitsize/stddef.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/../include/bitsize64/stddef.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/../gplinclude/disk/common.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/../include/stdint.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/../include/bitsize/stdint.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/../include/bitsize64/stdint.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/../include/bitsize/stdintlimits.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/../include/bitsize64/stdintlimits.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/../include/bitsize/stdintconst.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/../include/bitsize64/stdintconst.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/../gplinclude/cpuid.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/../include/stdbool.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/../include/stdio.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/../include/stdarg.h \
+ /usr/lib/gcc/x86_64-linux-gnu/4.7/include/stdarg.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/../include/cpufeature.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/../include/sys/bitops.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/include/sys/x86_64/bitops.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/../include/sys/cpu.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/include/sys/x86_64/cpu.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/../include/sys/io.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/../include/inttypes.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/../gplinclude/disk/geom.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/../gplinclude/disk/msdos.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/../gplinclude/disk/partition.h \
+ /home/wrsadmin/github/syslinux-6.03/com32/gpllib/../gplinclude/disk/read.h
